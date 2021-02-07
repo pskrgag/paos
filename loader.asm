@@ -61,20 +61,15 @@ SetTextMode:
 	mov eax, 0x3
 	int 0x10
 
-	mov si, Message
-	mov ax, 0xb800
-	mov es, ax
-	xor di, di
-	mov cx, MessageLen
+	cli
+	lgdt [GdtPtr]
+	lidt [IdtPtr]
 
-Loop:
-	mov al, [si]
-	mov [es:di], al
-	mov byte[es:di + 1], 0xa
-	
-	add di, 2
-	add si, 1
-	loop Loop
+	mov eax, cr0
+	or eax, 1
+	mov cr0, eax
+
+	jmp 8:ProtecdeModeEntry
 
 ReadError:
 NotSupport:
@@ -82,8 +77,58 @@ End:
 	hlt
 	jmp End
 
+[BITS 32]
+ProtecdeModeEntry:
+	mov byte [0xb8000], 'P'
+	mov byte [0xb8001], 0xa
+
+	mov ax, 0x10 ; 16
+	mov ds, ax
+	mov es, ax
+	mov ss, ax
+	mov esp, 0x7c00
+
+	cld
+	mov edi, 0x80000
+	xor eax, eax
+	mov ecx, 0x10000/4
+	rep stosd
+
+	mov dword [0x80000], 0x81007
+	mov dword [0x81000], 10000111b
+
+	lgdt [GtdPtr64]
+
+	mov eax, cr4
+	or eax, (1 << 5)
+	mov cr4, eax
+
+	mov eax, 0x80000
+	mov cr3, eax
+
+	mov ecx, 0xc0000080
+	rdmsr
+	or eax, (1 << 8)
+	wrmsr
+
+	mov eax, cr0
+	or eax, (1 << 31)
+	mov cr0, eax
+
+	jmp 8:LongMode
+
+[BITS 64]
+LongMode:
+	mov rsp, 0x7c000
+
+	mov byte [0xb8000], 'L'
+	mov byte [0xb8001], 0xa
+EndLoop:
+	hlt
+	jmp End
+
 DriveId:	db 0
-Message:	db "TextMode is set"
+Message:	db "Long Mode is enabled"
 MessageLen:	equ $-Message
 ReadPacket:
 	db 0x10
@@ -93,3 +138,40 @@ ReadPacket:
 	dw 0x1000
 	db 6	; 6 sector
 	times 7 db 0x0000
+
+Gtd:
+	dq 0x00
+Code:
+	dw 0xffff
+	dw 0x0000
+	db 0x00
+	db 0x9a
+	db 0xcf
+	db 0x00
+Date:
+	dw 0xffff
+	dw 0x0000
+	db 0x00
+	db 0x92
+	db 0xcf
+	db 0x00
+
+GtdLen:	equ $ - Gtd
+GdtPtr:	
+	dw GtdLen - 1
+	dd Gtd
+
+IdtPtr:
+	dw 0x00
+	dd 0x00
+
+
+Gtd64:
+	dq 0x00
+	dq 0x0020980000000000
+
+GtdLen64:	equ $ - Gtd64
+
+GtdPtr64:
+	dw GtdLen64 - 1
+	dd Gtd64

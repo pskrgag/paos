@@ -19,6 +19,12 @@ TestDiskExtension:
 
 LoadLoader:
 	mov si, ReadPacket
+	mov word[si],0x10
+    mov word[si+2],5
+    mov word[si+4],0x7e00
+    mov word[si+6],0
+    mov dword[si+8],1
+    mov dword[si+0xc],0
 	mov dl, [DriveId]
 	mov ah, 0x42
 	int 0x13
@@ -45,8 +51,7 @@ DriveId:	db 0
 Message:	db "We have an error in boot process"
 MessageLen:	equ $-Message
 ReadPacket:
-	db 0x10
-	db 0x00
+	dw 0x0010
 	dw 0x0005
 	dw 0x7e00
 	dw 0x0000
