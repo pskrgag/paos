@@ -25,21 +25,23 @@ GetMemoryInfoSetup:
 	mov eax, 0xe820
 	mov edx, 0x534d4150
 	mov ecx, 20
-	mov edi, 0x9000
+	mov dword [0x9000],0
+	mov edi, 0x9008
 	xor ebx, ebx
 	int 0x15
 	jc NotSupport
 
 GetMemoryInfo:
 	add edi, 20
+	inc dword [0x9000]
+	test ebx, ebx
+	jz StopMemInfo
+	
 	mov eax, 0xe820
 	mov edx, 0x534d4150
 	mov ecx, 20
 	int 0x15
-	jc StopMemInfo
-
-	test ebx, ebx
-	jnz GetMemoryInfo
+	jnc GetMemoryInfo
 
 StopMemInfo:
 
@@ -71,6 +73,7 @@ SetTextMode:
 
 	jmp 8:ProtecdeModeEntry
 
+NoFPU:
 ReadError:
 NotSupport:
 End:
@@ -119,13 +122,19 @@ ProtecdeModeEntry:
 
 [BITS 64]
 LongMode:
+	xor ax, ax
+	mov ds, ax
+	mov es, ax
+	mov ss, ax
 	mov rsp, 0x7c000
 
-	mov byte [0xb8000], 'L'
-	mov byte [0xb8001], 0xa
-EndLoop:
-	hlt
-	jmp End
+	cld
+	mov rdi, 0x200000
+	mov rsi, 0x10000
+	mov rcx, 512 * 100 / 8
+	rep movsq
+
+	jmp 0x200000
 
 DriveId:	db 0
 Message:	db "Long Mode is enabled"
